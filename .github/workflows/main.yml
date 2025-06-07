@@ -15,16 +15,22 @@ jobs:
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
         Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "admin@123" -Force)
 
-    - name: Download Remote.it CLI
+    - name: Download and install Remote.it CLI
       run: |
-        Invoke-WebRequest -Uri "https://downloads.remote.it/cli/remoteit-4.16.1-windows-amd64.zip" -OutFile "remoteit.zip"
-        Expand-Archive remoteit.zip -DestinationPath "$env:USERPROFILE\remoteit"
-        Add-Content "$env:GITHUB_PATH" "$env:USERPROFILE\remoteit"
+        Invoke-WebRequest -Uri "https://downloads.remote.it/cli/remoteit-4.16.1-windows-amd64.zip" -OutFile "$env:TEMP\remoteit.zip"
+        Expand-Archive "$env:TEMP\remoteit.zip" -DestinationPath "$env:USERPROFILE\remoteit"
+        echo "$env:USERPROFILE\remoteit" | Out-File -Append -FilePath $env:GITHUB_PATH
 
-    - name: Register device and setup RDP service
+    - name: Log in to Remote.it and register service
+      env:
+        R3_API_KEY: ${{ secrets.REMOTEIT_API_KEY }}
+        R3_USERNAME: ${{ secrets.REMOTEIT_USERNAME }}
+        R3_PASSWORD: ${{ secrets.REMOTEIT_PASSWORD }}
       run: |
-        remoteit login --username "${{ secrets.REMOTEIT_USERNAME }}" --password "${{ secrets.REMOTEIT_PASSWORD }}"
+        remoteit login --username "$env:R3_USERNAME" --password "$env:R3_PASSWORD"
         remoteit register --name "GitHub-RDP" --type win --host 127.0.0.1 --port 3389
         remoteit add-service --name RDP --port 3389
         remoteit list
-        Start-Sleep -Seconds 21600  # keep the runner alive for 6 hours
+
+    - name: Keep runner alive
+      run: Start-Sleep -Seconds 21600
